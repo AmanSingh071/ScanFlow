@@ -30,7 +30,6 @@ export default function App(){
  const[convertModal,setConvertModal]=useState(false),[convertBusy,setConvertBusy]=useState(false),[convertResult,setConvertResult]=useState("");
  const[serverModal,setServerModal]=useState(false),[serverUrl,setServerUrl]=useState("https://scanflow-converter.onrender.com"),[serverInput,setServerInput]=useState("https://scanflow-converter.onrender.com");
  const[convertMode,setConvertMode]=useState<"main"|"more">("main");
- const[pickAction,setPickAction]=useState<"pdf"|"images"|null>(null);
  const c=dark?{bg:"#0D1117",card:"#161B22",soft:"#212936",text:"#F0F6FC",muted:"#8B98A9",border:"#30363D",accent:"#4F8CFF",danger:"#FF6B6B"}:{bg:"#F5F7FB",card:"#FFF",soft:"#EEF2F7",text:"#162033",muted:"#718096",border:"#E2E8F0",accent:"#3B82F6",danger:"#EF4444"};
 
  useEffect(()=>{AsyncStorage.getItem(KEY).then(x=>{if(x){const v=JSON.parse(x);setDocs(v.docs||[]);setTrash(v.trash||[])}})},[]);
@@ -169,10 +168,6 @@ export default function App(){
   if(!serverUrl)throw new Error("NO_SERVER");
   const type=name.toLowerCase().endsWith(".pdf")?"application/pdf":name.toLowerCase().endsWith(".docx")?"application/vnd.openxmlformats-officedocument.wordprocessingml.document":"application/msword";
   const form=new FormData();form.append("file",{uri:path,name,type} as any);
-  const r=await fetch(serverUrl+endpoint,{method:"POST",body:form});
-  if(!r.ok)throw new Error(await r.text());
-  const b64=await r.text().then(async()=>null).catch(()=>null);
-  // React Native fetch responses can be converted reliably via arrayBuffer.
   const response=await fetch(serverUrl+endpoint,{method:"POST",body:form});
   if(!response.ok)throw new Error(await response.text());
   const ab=await response.arrayBuffer();const bytes=new Uint8Array(ab);
