@@ -1,36 +1,8 @@
 {
-  "expo": {
-    "name": "ScanFlow",
-    "slug": "ScanFlow",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.aman071803.ScanFlow"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "a6e50f5e-c95a-4752-b511-bcd7db387072"
-      }
-    }
-  }
+  "expo":{"name":"ScanFlow","slug":"ScanFlow","version":"2.0.0","orientation":"portrait","icon":"./assets/icon.png","userInterfaceStyle":"automatic","newArchEnabled":true,
+  "splash":{"image":"./assets/splash-icon.png","resizeMode":"contain","backgroundColor":"#ffffff"},
+  "ios":{"supportsTablet":true,"infoPlist":{"NSCameraUsageDescription":"ScanFlow uses the camera to scan documents.","NSPhotoLibraryUsageDescription":"ScanFlow imports images and documents from your library."}},
+  "android":{"adaptiveIcon":{"foregroundImage":"./assets/adaptive-icon.png","backgroundColor":"#ffffff"},"edgeToEdgeEnabled":true,"predictiveBackGestureEnabled":false,"package":"com.aman071803.ScanFlow","permissions":["CAMERA","READ_MEDIA_IMAGES"]},
+  "plugins":["expo-camera","expo-image-picker","expo-document-picker"],
+  "web":{"favicon":"./assets/favicon.png"},"extra":{"eas":{"projectId":"a6e50f5e-c95a-4752-b511-bcd7db387072"}}}
 }
