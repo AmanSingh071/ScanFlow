@@ -25,7 +25,7 @@ export default function App(){
  const[ref,setRef]=useState<CameraView|null>(null),[permission,ask]=useCameraPermissions(),[flash,setFlash]=useState(false);
  const[menu,setMenu]=useState<Doc|null>(null),[rename,setRename]=useState(""),[renaming,setRenaming]=useState(false);\n const[textModal,setTextModal]=useState(false),[textTitle,setTextTitle]=useState("New Text Document"),[textBody,setTextBody]=useState(""),[noteModal,setNoteModal]=useState(false),[note,setNote]=useState("");
  const[signatureModal,setSignatureModal]=useState(false),[signature,setSignature]=useState(""),[annotationModal,setAnnotationModal]=useState(false),[annotation,setAnnotation]=useState("");
- const[grid,setGrid]=useState(false),[selected,setSelected]=useState<string[]>([]),[selectMode,setSelectMode]=useState(false),[tagModal,setTagModal]=useState(false),[tag,setTag]=useState(""),[tags,setTags]=useState<string[]>([]);\n const[convertModal,setConvertModal]=useState(false),[convertBusy,setConvertBusy]=useState(false),[convertResult,setConvertResult]=useState("");\n const[convertMode,setConvertMode]=useState<"main"|"more">("main");
+ const[grid,setGrid]=useState(false),[selected,setSelected]=useState<string[]>([]),[selectMode,setSelectMode]=useState(false),[tagModal,setTagModal]=useState(false),[tag,setTag]=useState(""),[tags,setTags]=useState<string[]>([]);\n const[convertModal,setConvertModal]=useState(false),[convertBusy,setConvertBusy]=useState(false),[convertResult,setConvertResult]=useState("");\n const[serverModal,setServerModal]=useState(false),[serverUrl,setServerUrl]=useState(""),[serverInput,setServerInput]=useState("");\n const[convertMode,setConvertMode]=useState<"main"|"more">("main");
  const c=dark?{bg:"#0D1117",card:"#161B22",soft:"#212936",text:"#F0F6FC",muted:"#8B98A9",border:"#30363D",accent:"#4F8CFF",danger:"#FF6B6B"}:{bg:"#F5F7FB",card:"#FFF",soft:"#EEF2F7",text:"#162033",muted:"#718096",border:"#E2E8F0",accent:"#3B82F6",danger:"#EF4444"};
 
  useEffect(()=>{AsyncStorage.getItem(KEY).then(x=>{if(x){const v=JSON.parse(x);setDocs(v.docs||[]);setTrash(v.trash||[])}})},[]);
@@ -128,41 +128,48 @@ export default function App(){
   if(await Sharing.isAvailableAsync()) await Sharing.shareAsync(r.uri);
   return r.uri;
  }
+ async function saveConverterUrl(){
+  let u=serverInput.trim().replace(/\/$/,"");
+  if(!/^https?:\/\//.test(u)){Alert.alert("Invalid address","Use http://192.168.x.x:8000");return}
+  try{const r=await fetch(u+"/health");if(!r.ok)throw new Error();setServerUrl(u);await AsyncStorage.setItem("@scanflow_converter_url",u);setServerModal(false);Alert.alert("Connected","Free converter server connected successfully.");}
+  catch{Alert.alert("Cannot connect","Make sure your PC server is running, the phone and PC are on the same Wi-Fi, and use your PC's IPv4 address.")}
+ }
+ async function uploadToConverter(path:string,name:string,endpoint:string){
+  if(!serverUrl) throw new Error("NO_SERVER");
+  const form=new FormData();
+  form.append("file",{uri:path,name,type:name.toLowerCase().endsWith(".pdf")?"application/pdf":name.toLowerCase().endsWith(".docx")?"application/vnd.openxmlformats-officedocument.wordprocessingml.document":"application/msword"} as any);
+  const r=await fetch(serverUrl+endpoint,{method:"POST",body:form});
+  if(!r.ok) throw new Error(await r.text());
+  const blob=await r.blob();
+  const ext=endpoint==="/word-to-pdf"?"pdf":endpoint==="/pdf-to-word"?"docx":endpoint==="/pdf-to-images"?"zip":"pdf";
+  const out=FileSystem.cacheDirectory+"scanflow-"+Date.now()+"."+ext;
+  const reader=new FileReader();
+  await new Promise<void>((resolve,reject)=>{reader.onloadend=()=>FileSystem.writeAsStringAsync(out,String(reader.result).split(",")[1]||"",{encoding:FileSystem.EncodingType.Base64}).then(resolve,reject);reader.onerror=reject;reader.readAsDataURL(blob)});
+  return out;
+ }
  async function runConversion(kind:"imagepdf"|"wordpdf"|"pdfword"|"pdfimages"|"extract"|"imagestext"){
-  try{
-   setConvertBusy(true);setConvertResult("");
-   if(kind==="pdfimages"){
-    const pick=await DocumentPicker.getDocumentAsync({type:"application/pdf",copyToCacheDirectory:true,multiple:false});
-    if(pick.canceled)return;
-    Alert.alert("PDF → Images","Imported PDF support is ready, but rendering arbitrary PDF pages to images requires a native PDF renderer. This will be part of the native PDF engine batch.");
-    return;
-   }
-   if(kind==="extract"){
-    const pick=await DocumentPicker.getDocumentAsync({type:"application/pdf",copyToCacheDirectory:true,multiple:false});
-    if(pick.canceled)return;
-    Alert.alert("Extract pages","For scans created in ScanFlow, use the Split scan feature. Arbitrary imported PDF page extraction requires the native PDF engine.");
-    return;
-   }
-   if(kind==="imagestext"){
-    const pick=await ImagePicker.launchImageLibraryAsync({mediaTypes:["images"],allowsMultipleSelection:true,quality:1});
-    if(pick.canceled||!pick.assets?.length)return;
-    const html="<html><body style='font-family:Arial;padding:28px'><h2>Image information</h2>"+pick.assets.map((a,i)=>"<p><b>Image "+(i+1)+"</b><br/>File selected from device. OCR text recognition can be added later with an OCR engine.</p>").join("")+"</body></html>";
-    const r=await Print.printToFileAsync({html});setDocs(v=>[{id:uid(),name:"Image Information",pages:[],createdAt:Date.now(),favorite:false,folder:"Text",pdfUri:r.uri,fileType:"text"},...v]);setConvertResult("Created image information PDF.");return;
-   }
   try{
    setConvertBusy(true);setConvertResult("");
    if(kind==="imagepdf"){
     const pick=await ImagePicker.launchImageLibraryAsync({mediaTypes:["images"],allowsMultipleSelection:true,quality:0.95});
     if(pick.canceled||!pick.assets?.length)return;
     const d:Doc={id:uid(),name:"Images PDF "+new Date().toLocaleDateString(),pages:pick.assets.map(a=>({id:uid(),uri:a.uri,rotation:0})),createdAt:Date.now(),favorite:false,folder:"My Scans"};
-    setDocs(v=>[d,...v]);await exportPdf(d);setConvertResult("Images converted to PDF successfully.");
-    return;
+    setDocs(v=>[d,...v]);await exportPdf(d);setConvertResult("Images converted to PDF successfully.");return;
    }
+   if(kind==="imagestext"){Alert.alert("OCR","OCR is not included in this free converter yet. We can add an offline OCR engine in the next batch.");return}
    const type=kind==="wordpdf"?["application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:["application/pdf"];
    const pick=await DocumentPicker.getDocumentAsync({type,copyToCacheDirectory:true,multiple:false});
    if(pick.canceled||!pick.assets?.[0])return;
-   Alert.alert("Conversion server needed","Word ↔ PDF needs the secure converter backend. The file selector is ready, but this APK cannot perform high-fidelity Office conversion without the backend.");
-  }catch(e){Alert.alert("Conversion error","Could not complete this conversion.");}finally{setConvertBusy(false)}
+   const a=pick.assets[0];
+   if(!serverUrl){setServerInput("");setServerModal(true);return}
+   const endpoint=kind==="wordpdf"?"/word-to-pdf":kind==="pdfword"?"/pdf-to-word":kind==="pdfimages"?"/pdf-to-images":"/pdf-split";
+   const out=await uploadToConverter(a.uri,a.name||"document",endpoint);
+   if(kind==="wordpdf"||kind==="pdfword") setDocs(v=>[{id:uid(),name:(a.name||"Converted")+" → "+(kind==="wordpdf"?"PDF":"DOCX"),pages:[],createdAt:Date.now(),favorite:false,folder:"Converted",pdfUri:out,fileType:"pdf"},...v]);
+   if(await Sharing.isAvailableAsync()) await Sharing.shareAsync(out);
+   setConvertResult("Conversion completed successfully.");
+  }catch(e:any){
+   Alert.alert(e?.message==="NO_SERVER"?"Connect converter":"Conversion error",e?.message==="NO_SERVER"?"Set up the free converter server first.":"Could not complete conversion. Check the server and Wi-Fi connection.");
+  }finally{setConvertBusy(false)}
  }
  function moveFolder(doc:Doc){const choices=["My Scans","Imported","Text","Work","Personal"];Alert.alert("Move to folder","Choose a folder",[...choices.map(f=>({text:f,onPress:()=>{setDocs(x=>x.map(d=>d.id===doc.id?{...d,folder:f}:d));setMenu(null)}})),{text:"Cancel",style:"cancel"}])}
  const tool=(title:string,msg:string)=>Alert.alert(title,msg);
