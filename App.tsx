@@ -23,9 +23,13 @@ export default function App(){
  const[sort,setSort]=useState<"new"|"name"|"pages">("new");
  const[scanner,setScanner]=useState(false),[camera,setCamera]=useState(false),[review,setReview]=useState(false),[pages,setPages]=useState<Page[]>([]);
  const[ref,setRef]=useState<CameraView|null>(null),[permission,ask]=useCameraPermissions(),[flash,setFlash]=useState(false);
- const[menu,setMenu]=useState<Doc|null>(null),[rename,setRename]=useState(""),[renaming,setRenaming]=useState(false);\n const[textModal,setTextModal]=useState(false),[textTitle,setTextTitle]=useState("New Text Document"),[textBody,setTextBody]=useState(""),[noteModal,setNoteModal]=useState(false),[note,setNote]=useState("");
+ const[menu,setMenu]=useState<Doc|null>(null),[rename,setRename]=useState(""),[renaming,setRenaming]=useState(false);
+ const[textModal,setTextModal]=useState(false),[textTitle,setTextTitle]=useState("New Text Document"),[textBody,setTextBody]=useState(""),[noteModal,setNoteModal]=useState(false),[note,setNote]=useState("");
  const[signatureModal,setSignatureModal]=useState(false),[signature,setSignature]=useState(""),[annotationModal,setAnnotationModal]=useState(false),[annotation,setAnnotation]=useState("");
- const[grid,setGrid]=useState(false),[selected,setSelected]=useState<string[]>([]),[selectMode,setSelectMode]=useState(false),[tagModal,setTagModal]=useState(false),[tag,setTag]=useState(""),[tags,setTags]=useState<string[]>([]);\n const[convertModal,setConvertModal]=useState(false),[convertBusy,setConvertBusy]=useState(false),[convertResult,setConvertResult]=useState("");\n const[serverModal,setServerModal]=useState(false),[serverUrl,setServerUrl]=useState("https://scanflow-converter.onrender.com"),[serverInput,setServerInput]=useState("https://scanflow-converter.onrender.com");\n const[convertMode,setConvertMode]=useState<"main"|"more">("main");
+ const[grid,setGrid]=useState(false),[selected,setSelected]=useState<string[]>([]),[selectMode,setSelectMode]=useState(false),[tagModal,setTagModal]=useState(false),[tag,setTag]=useState(""),[tags,setTags]=useState<string[]>([]);
+ const[convertModal,setConvertModal]=useState(false),[convertBusy,setConvertBusy]=useState(false),[convertResult,setConvertResult]=useState("");
+ const[serverModal,setServerModal]=useState(false),[serverUrl,setServerUrl]=useState("https://scanflow-converter.onrender.com"),[serverInput,setServerInput]=useState("https://scanflow-converter.onrender.com");
+ const[convertMode,setConvertMode]=useState<"main"|"more">("main");
  const c=dark?{bg:"#0D1117",card:"#161B22",soft:"#212936",text:"#F0F6FC",muted:"#8B98A9",border:"#30363D",accent:"#4F8CFF",danger:"#FF6B6B"}:{bg:"#F5F7FB",card:"#FFF",soft:"#EEF2F7",text:"#162033",muted:"#718096",border:"#E2E8F0",accent:"#3B82F6",danger:"#EF4444"};
 
  useEffect(()=>{AsyncStorage.getItem(KEY).then(x=>{if(x){const v=JSON.parse(x);setDocs(v.docs||[]);setTrash(v.trash||[])}})},[]);
@@ -190,11 +194,19 @@ export default function App(){
 
  const tools=<><Text style={[s.screenTitle,{color:c.text}]}>Tools</Text><Text style={[s.sub,{color:c.muted}]}>Document utilities available in ScanFlow</Text><View style={s.grid}>
  {[
- ["📄","Image to PDF",()=>setTab("Scan")],["📤","Export & Share",()=>tool("Export","Open any document and tap it to create/share a PDF.")],\n ["🖼️","Images → PDF",()=>{setConvertModal(true)}],\n ["📘","Word → PDF",()=>{setConvertModal(true)}],\n ["📕","PDF → Word",()=>{setConvertModal(true)}],\n ["📥","Import PDF",importPdf],\n ["📝","Text to PDF",()=>setTextModal(true)],
- ["⭐","Favorites",()=>setDocs(x=>[...x.filter(d=>d.favorite),...x.filter(d=>!d.favorite)])],["🗑️","Trash",()=>Alert.alert("Trash",trash.length?trash.map(x=>x.name).join("\n"):"Trash is empty")],
+ ["📄","Image to PDF",()=>setTab("Scan")],["📤","Export & Share",()=>tool("Export","Open any document and tap it to create/share a PDF.")],
+ ["🖼️","Images → PDF",()=>{setConvertModal(true)}],
+ ["📘","Word → PDF",()=>{setConvertModal(true)}],
+ ["📕","PDF → Word",()=>{setConvertModal(true)}],
+ ["📥","Import PDF",importPdf],
+ ["📝","Text to PDF",()=>setTextModal(true)],
+ ["⭐","Favorites",()=>setDocs(x=>[...x.filter(d=>d.favorite),...x.filter(d=>!d.favorite)])],["🗑️","Trash",()=>Alert.alert("Trash",trash.length?trash.map(x=>x.name).join("
+"):"Trash is empty")],
  ["✏️","Rename",()=>tool("Rename","Long-press or tap the ⋮ menu on a document.")],["🖼️","Multi-page Import",gallery],
  ["🔎","OCR Text",()=>tool("OCR engine","OCR will be connected to the conversion backend so scanned PDFs can return editable text.")],["🔄","PDF ↔ Word",()=>tool("PDF ↔ Word","Conversion is wired for the secure backend batch; it needs a server API key and must not be embedded in the APK.")],
- ["🗜️","Compress scans",()=>{const d=docs.find(z=>z.pages.length>0);d?compressDocument(d):Alert.alert("No scan","Save a scanned document first.")}],["✂️","Merge scanned docs",mergeScans],["🧩","Split scan",()=>{const d=docs.find(z=>z.pages.length>1);d?splitScan(d):Alert.alert("No multi-page scan","Save a document with at least 2 pages.")}],\n ["📋","Copy Text",()=>tool("Copy text","Text documents can be copied from their document menu.")],\n ["📂","Move Folder",()=>tool("Folders","Use a document menu to move documents between folders.")]
+ ["🗜️","Compress scans",()=>{const d=docs.find(z=>z.pages.length>0);d?compressDocument(d):Alert.alert("No scan","Save a scanned document first.")}],["✂️","Merge scanned docs",mergeScans],["🧩","Split scan",()=>{const d=docs.find(z=>z.pages.length>1);d?splitScan(d):Alert.alert("No multi-page scan","Save a document with at least 2 pages.")}],
+ ["📋","Copy Text",()=>tool("Copy text","Text documents can be copied from their document menu.")],
+ ["📂","Move Folder",()=>tool("Folders","Use a document menu to move documents between folders.")]
  ].map(([icon,title,action]:any)=><TouchableOpacity key={title} onPress={action} style={[s.tool,{backgroundColor:c.card,borderColor:c.border}]}><Text style={{fontSize:28}}>{icon}</Text><Text style={[s.toolTitle,{color:c.text}]}>{title}</Text></TouchableOpacity>)}</View></>;
 
  const settings=<><Text style={[s.screenTitle,{color:c.text}]}>Settings</Text>
