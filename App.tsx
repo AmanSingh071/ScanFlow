@@ -30,6 +30,7 @@ export default function App(){
  const[convertModal,setConvertModal]=useState(false),[convertBusy,setConvertBusy]=useState(false),[convertResult,setConvertResult]=useState("");
  const[serverModal,setServerModal]=useState(false),[serverUrl,setServerUrl]=useState("https://scanflow-converter.onrender.com"),[serverInput,setServerInput]=useState("https://scanflow-converter.onrender.com");
  const[convertMode,setConvertMode]=useState<"main"|"more">("main");
+ const[pickAction,setPickAction]=useState<"pdf"|"images"|null>(null);
  const c=dark?{bg:"#0D1117",card:"#161B22",soft:"#212936",text:"#F0F6FC",muted:"#8B98A9",border:"#30363D",accent:"#4F8CFF",danger:"#FF6B6B"}:{bg:"#F5F7FB",card:"#FFF",soft:"#EEF2F7",text:"#162033",muted:"#718096",border:"#E2E8F0",accent:"#3B82F6",danger:"#EF4444"};
 
  useEffect(()=>{AsyncStorage.getItem(KEY).then(x=>{if(x){const v=JSON.parse(x);setDocs(v.docs||[]);setTrash(v.trash||[])}})},[]);
@@ -39,7 +40,18 @@ export default function App(){
  const shown=useMemo(()=>docs.filter(d=>(folder==="All"||d.folder===folder)&&d.name.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):sort==="pages"?b.pages.length-a.pages.length:b.createdAt-a.createdAt),[docs,folder,search,sort]);
 
  const add=(uris:string[])=>setPages(x=>[...x,...uris.map(uri=>({id:uid(),uri,rotation:0}))]);
- async function gallery(){const p=await ImagePicker.requestMediaLibraryPermissionsAsync();if(!p.granted)return Alert.alert("Permission required","Allow image access.");const r=await ImagePicker.launchImageLibraryAsync({mediaTypes:["images"],allowsMultipleSelection:true,quality:0.9});if(!r.canceled){add(r.assets.map(a=>a.uri));setScanner(false);setReview(true)}}
+ async function gallery(){
+  const p=await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if(!p.granted)return Alert.alert("Permission required","Allow image access.");
+  const r=await ImagePicker.launchImageLibraryAsync({mediaTypes:["images"],allowsMultipleSelection:true,quality:0.9});
+  if(r.canceled||!r.assets?.length)return;
+  const uris=r.assets.map(a=>a.uri);
+  Alert.alert("What would you like to do?",`${uris.length} image(s) selected.`,[
+   {text:"Save as images",onPress:()=>{setDocs(d=>[...uris.map((uri,i)=>({id:uid(),name:`Image ${new Date().toLocaleDateString()} ${i+1}`,pages:[{id:uid(),uri,rotation:0}],createdAt:Date.now(),favorite:false,folder:"Images"})),...d]);setTab("Library")},
+   {text:"Make one PDF",onPress:()=>{setPages([]);add(uris);setScanner(false);setReview(true)}},
+   {text:"Cancel",style:"cancel"}
+  ]);
+ }
  async function importPdf(){
   const r=await DocumentPicker.getDocumentAsync({type:"application/pdf",copyToCacheDirectory:true,multiple:false});
   if(!r.canceled&&r.assets?.[0]){
@@ -110,14 +122,29 @@ export default function App(){
  function save(){if(!pages.length)return;setDocs(x=>[{id:uid(),name:"Scan "+new Date().toLocaleString(),pages,createdAt:Date.now(),favorite:false,folder:"My Scans"},...x]);setPages([]);setReview(false);setTab("Library")}
  async function exportPdf(doc:Doc){
   try{
-   const html="<html><body style='margin:0;background:#fff'>"+doc.pages.map(p=>{const fx=p.filter==="gray"?"filter:grayscale(1);":p.filter==="high"?"filter:contrast(1.65) saturate(.25);":"";return "<div style='page-break-after:always;padding:12px'><img src='"+p.uri+"' style='width:100%;height:auto;display:block;"+fx+"'/>"+(doc.annotation?"<div style='margin-top:10px;font:14px Arial;color:#333'><b>Note:</b> "+doc.annotation.replace(/</g,"&lt;")+"</div>":"")+(doc.signature?"<div style='margin-top:28px;text-align:right;font:italic 24px cursive;border-top:1px solid #aaa;padding-top:8px'>"+doc.signature.replace(/</g,"&lt;")+"</div>":"")+"</div>"}).join("")+"</body></html>";
+   if(doc.pdfUri){
+    if(await Sharing.isAvailableAsync()) await Sharing.shareAsync(doc.pdfUri,{mimeType:"application/pdf",dialogTitle:"Share "+doc.name});
+    return doc.pdfUri;
+   }
+   if(!doc.pages.length)return Alert.alert("No pages","This document has no pages to export.");
+   const pageHtml=await Promise.all(doc.pages.map(async p=>{
+    const base64=await FileSystem.readAsStringAsync(p.uri,{encoding:FileSystem.EncodingType.Base64});
+    const ext=(p.uri.split(".").pop()||"jpg").toLowerCase();
+    const mime=ext==="png"?"image/png":"image/jpeg";
+    const fx=p.filter==="gray"?"filter:grayscale(1);":p.filter==="high"?"filter:contrast(1.65) saturate(.25);":"";
+    return "<section style='page-break-after:always;padding:12px'><img src='data:"+mime+";base64,"+base64+"' style='width:100%;height:auto;display:block;"+fx+"'/></section>";
+   }));
+   const html="<html><body style='margin:0;background:#fff'>"+pageHtml.join("")+
+    (doc.annotation?"<div style='margin:16px;font:14px Arial'><b>Note:</b> "+doc.annotation.replace(/</g,"&lt;")+"</div>":"")+
+    (doc.signature?"<div style='margin:28px;text-align:right;font:italic 24px cursive;border-top:1px solid #aaa;padding-top:8px'>"+doc.signature.replace(/</g,"&lt;")+"</div>":"")+
+    "</body></html>";
    const r=await Print.printToFileAsync({html});
-   setDocs(x=>x.map(d=>d.id===doc.id?{...d,pdfUri:r.uri}:d));
+   setDocs(ds=>ds.map(d=>d.id===doc.id?{...d,pdfUri:r.uri}:d));
    if(await Sharing.isAvailableAsync())await Sharing.shareAsync(r.uri,{mimeType:"application/pdf",dialogTitle:"Share "+doc.name});
-   else Alert.alert("PDF created",r.uri);
-  }catch(e){Alert.alert("PDF error","Could not create the PDF on this device.")}
+   return r.uri;
+  }catch(e){Alert.alert("PDF error","Could not create the PDF on this device.");}
  }
- async function shareDoc(doc:Doc){if((doc.pdfUri||doc.sourceUri)&&await Sharing.isAvailableAsync())return Sharing.shareAsync(doc.pdfUri||doc.sourceUri!,{mimeType:"application/pdf"});return exportPdf(doc)}
+ async function shareDoc(doc:Doc){if(doc.pdfUri)return exportPdf(doc);if(doc.sourceUri&&await Sharing.isAvailableAsync())return Sharing.shareAsync(doc.sourceUri);return exportPdf(doc)}
  function toggleFav(id:string){setDocs(x=>x.map(d=>d.id===id?{...d,favorite:!d.favorite}:d))}
  function trashDoc(doc:Doc){setDocs(x=>x.filter(d=>d.id!==doc.id));setTrash(x=>[doc,...x]);setMenu(null)}
  function restore(doc:Doc){setTrash(x=>x.filter(d=>d.id!==doc.id));setDocs(x=>[doc,...x])}
@@ -139,41 +166,40 @@ export default function App(){
   catch{Alert.alert("Cannot connect","Make sure your PC server is running, the phone and PC are on the same Wi-Fi, and use your PC's IPv4 address.")}
  }
  async function uploadToConverter(path:string,name:string,endpoint:string){
-  if(!serverUrl) throw new Error("NO_SERVER");
-  const form=new FormData();
-  form.append("file",{uri:path,name,type:name.toLowerCase().endsWith(".pdf")?"application/pdf":name.toLowerCase().endsWith(".docx")?"application/vnd.openxmlformats-officedocument.wordprocessingml.document":"application/msword"} as any);
+  if(!serverUrl)throw new Error("NO_SERVER");
+  const type=name.toLowerCase().endsWith(".pdf")?"application/pdf":name.toLowerCase().endsWith(".docx")?"application/vnd.openxmlformats-officedocument.wordprocessingml.document":"application/msword";
+  const form=new FormData();form.append("file",{uri:path,name,type} as any);
   const r=await fetch(serverUrl+endpoint,{method:"POST",body:form});
-  if(!r.ok) throw new Error(await r.text());
-  const blob=await r.blob();
+  if(!r.ok)throw new Error(await r.text());
+  const b64=await r.text().then(async()=>null).catch(()=>null);
+  // React Native fetch responses can be converted reliably via arrayBuffer.
+  const response=await fetch(serverUrl+endpoint,{method:"POST",body:form});
+  if(!response.ok)throw new Error(await response.text());
+  const ab=await response.arrayBuffer();const bytes=new Uint8Array(ab);
+  let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+  const base64=globalThis.btoa(binary);
   const ext=endpoint==="/word-to-pdf"?"pdf":endpoint==="/pdf-to-word"?"docx":endpoint==="/pdf-to-images"?"zip":"pdf";
   const out=FileSystem.cacheDirectory+"scanflow-"+Date.now()+"."+ext;
-  const reader=new FileReader();
-  await new Promise<void>((resolve,reject)=>{reader.onloadend=()=>FileSystem.writeAsStringAsync(out,String(reader.result).split(",")[1]||"",{encoding:FileSystem.EncodingType.Base64}).then(resolve,reject);reader.onerror=reject;reader.readAsDataURL(blob)});
+  await FileSystem.writeAsStringAsync(out,base64,{encoding:FileSystem.EncodingType.Base64});
   return out;
  }
  async function runConversion(kind:"imagepdf"|"wordpdf"|"pdfword"|"pdfimages"|"extract"|"imagestext"){
-  try{
-   setConvertBusy(true);setConvertResult("");
-   if(kind==="imagepdf"){
-    const pick=await ImagePicker.launchImageLibraryAsync({mediaTypes:["images"],allowsMultipleSelection:true,quality:0.95});
-    if(pick.canceled||!pick.assets?.length)return;
-    const d:Doc={id:uid(),name:"Images PDF "+new Date().toLocaleDateString(),pages:pick.assets.map(a=>({id:uid(),uri:a.uri,rotation:0})),createdAt:Date.now(),favorite:false,folder:"My Scans"};
-    setDocs(v=>[d,...v]);await exportPdf(d);setConvertResult("Images converted to PDF successfully.");return;
-   }
-   if(kind==="imagestext"){Alert.alert("OCR","OCR is not included in this free converter yet. We can add an offline OCR engine in the next batch.");return}
-   const type=kind==="wordpdf"?["application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:["application/pdf"];
-   const pick=await DocumentPicker.getDocumentAsync({type,copyToCacheDirectory:true,multiple:false});
-   if(pick.canceled||!pick.assets?.[0])return;
-   const a=pick.assets[0];
-   if(!serverUrl){setServerInput("");setServerModal(true);return}
-   const endpoint=kind==="wordpdf"?"/word-to-pdf":kind==="pdfword"?"/pdf-to-word":kind==="pdfimages"?"/pdf-to-images":"/pdf-split";
-   const out=await uploadToConverter(a.uri,a.name||"document",endpoint);
-   if(kind==="wordpdf"||kind==="pdfword") setDocs(v=>[{id:uid(),name:(a.name||"Converted")+" → "+(kind==="wordpdf"?"PDF":"DOCX"),pages:[],createdAt:Date.now(),favorite:false,folder:"Converted",pdfUri:out,fileType:"pdf"},...v]);
-   if(await Sharing.isAvailableAsync()) await Sharing.shareAsync(out);
-   setConvertResult("Conversion completed successfully.");
-  }catch(e:any){
-   Alert.alert(e?.message==="NO_SERVER"?"Connect converter":"Conversion error",e?.message==="NO_SERVER"?"Set up the free converter server first.":"Could not complete conversion. Check the server and Wi-Fi connection.");
-  }finally{setConvertBusy(false)}
+ try{
+  setConvertBusy(true);setConvertResult("");
+  if(kind==="imagepdf"){await gallery();return}
+  if(kind==="imagestext"){Alert.alert("OCR","OCR is not connected yet.");return}
+  const type=kind==="wordpdf"?["application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:["application/pdf"];
+  const pick=await DocumentPicker.getDocumentAsync({type,copyToCacheDirectory:true,multiple:false});
+  if(pick.canceled||!pick.assets?.[0])return;
+  const a=pick.assets[0];
+  const endpoint=kind==="wordpdf"?"/word-to-pdf":kind==="pdfword"?"/pdf-to-word":kind==="pdfimages"?"/pdf-to-images":"/pdf-split";
+  const out=await uploadToConverter(a.uri,a.name||"document",endpoint);
+  const isPdf=kind==="wordpdf";
+  setDocs(v=>[{id:uid(),name:(a.name||"Converted")+" → "+(isPdf?"PDF":kind==="pdfword"?"DOCX":"Images"),pages:[],createdAt:Date.now(),favorite:false,folder:"Converted",pdfUri:isPdf?out:undefined,sourceUri:isPdf?undefined:out,fileType:isPdf?"pdf":"text"},...v]);
+  if(await Sharing.isAvailableAsync())await Sharing.shareAsync(out);
+  setConvertResult("Conversion completed successfully.");
+ }catch(e:any){Alert.alert("Conversion error","Could not complete conversion. The free server may be waking up; wait a minute and try again.")}
+ finally{setConvertBusy(false)}
  }
  function moveFolder(doc:Doc){const choices=["My Scans","Imported","Text","Work","Personal"];Alert.alert("Move to folder","Choose a folder",[...choices.map(f=>({text:f,onPress:()=>{setDocs(x=>x.map(d=>d.id===doc.id?{...d,folder:f}:d));setMenu(null)}})),{text:"Cancel",style:"cancel"}])}
  const tool=(title:string,msg:string)=>Alert.alert(title,msg);
