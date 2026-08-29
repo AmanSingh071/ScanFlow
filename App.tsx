@@ -104,7 +104,7 @@ export default function App(){
  function save(){if(!pages.length)return;setDocs(x=>[{id:uid(),name:"Scan "+new Date().toLocaleString(),pages,createdAt:Date.now(),favorite:false,folder:"My Scans"},...x]);setPages([]);setReview(false);setTab("Library")}
  async function exportPdf(doc:Doc){
   try{
-   const html="<html><body style='margin:0;background:#fff'>"+doc.pages.map(p=>"<div style='page-break-after:always;padding:12px'><img src='"+p.uri+"' style='width:100%;height:auto;display:block'/>"+(doc.annotation?"<div style='margin-top:10px;font:14px Arial;color:#333'><b>Note:</b> "+doc.annotation.replace(/</g,"&lt;")+"</div>":"")+(doc.signature?"<div style='margin-top:28px;text-align:right;font:italic 24px cursive;border-top:1px solid #aaa;padding-top:8px'>"+doc.signature.replace(/</g,"&lt;")+"</div>":"")+"</div>").join("")+"</body></html>";
+   const html="<html><body style='margin:0;background:#fff'>"+doc.pages.map(p=>{const fx=p.filter==="gray"?"filter:grayscale(1);":p.filter==="high"?"filter:contrast(1.65) saturate(.25);":"";return "<div style='page-break-after:always;padding:12px'><img src='"+p.uri+"' style='width:100%;height:auto;display:block;"+fx+"'/>"+(doc.annotation?"<div style='margin-top:10px;font:14px Arial;color:#333'><b>Note:</b> "+doc.annotation.replace(/</g,"&lt;")+"</div>":"")+(doc.signature?"<div style='margin-top:28px;text-align:right;font:italic 24px cursive;border-top:1px solid #aaa;padding-top:8px'>"+doc.signature.replace(/</g,"&lt;")+"</div>":"")+"</div>"}).join("")+"</body></html>";
    const r=await Print.printToFileAsync({html});
    setDocs(x=>x.map(d=>d.id===doc.id?{...d,pdfUri:r.uri}:d));
    if(await Sharing.isAvailableAsync())await Sharing.shareAsync(r.uri,{mimeType:"application/pdf",dialogTitle:"Share "+doc.name});
