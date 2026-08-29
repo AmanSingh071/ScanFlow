@@ -46,9 +46,18 @@ export default function App(){
   if(r.canceled||!r.assets?.length)return;
   const uris=r.assets.map(a=>a.uri);
   Alert.alert("What would you like to do?",`${uris.length} image(s) selected.`,[
-   {text:"Save as images",onPress:()=>{setDocs(d=>[...uris.map((uri,i)=>({id:uid(),name:`Image ${new Date().toLocaleDateString()} ${i+1}`,pages:[{id:uid(),uri,rotation:0}],createdAt:Date.now(),favorite:false,folder:"Images"})),...d]);setTab("Library")},
-   {text:"Make one PDF",onPress:()=>{setPages([]);add(uris);setScanner(false);setReview(true)}},
-   {text:"Cancel",style:"cancel"}
+    {text:"Save as images",onPress:()=>{
+      setDocs(d=>[
+        ...uris.map((uri,i)=>({
+          id:uid(),name:`Image ${new Date().toLocaleDateString()} ${i+1}`,
+          pages:[{id:uid(),uri,rotation:0}],createdAt:Date.now(),favorite:false,folder:"Images"
+        })),
+        ...d
+      ]);
+      setTab("Library");
+    }},
+    {text:"Make one PDF",onPress:()=>{setPages([]);add(uris);setScanner(false);setReview(true);}},
+    {text:"Cancel",style:"cancel"}
   ]);
  }
  async function importPdf(){
