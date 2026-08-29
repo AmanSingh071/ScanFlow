@@ -25,7 +25,7 @@ export default function App(){
  const[ref,setRef]=useState<CameraView|null>(null),[permission,ask]=useCameraPermissions(),[flash,setFlash]=useState(false);
  const[menu,setMenu]=useState<Doc|null>(null),[rename,setRename]=useState(""),[renaming,setRenaming]=useState(false);\n const[textModal,setTextModal]=useState(false),[textTitle,setTextTitle]=useState("New Text Document"),[textBody,setTextBody]=useState(""),[noteModal,setNoteModal]=useState(false),[note,setNote]=useState("");
  const[signatureModal,setSignatureModal]=useState(false),[signature,setSignature]=useState(""),[annotationModal,setAnnotationModal]=useState(false),[annotation,setAnnotation]=useState("");
- const[grid,setGrid]=useState(false),[selected,setSelected]=useState<string[]>([]),[selectMode,setSelectMode]=useState(false),[tagModal,setTagModal]=useState(false),[tag,setTag]=useState(""),[tags,setTags]=useState<string[]>([]);\n const[convertModal,setConvertModal]=useState(false),[convertBusy,setConvertBusy]=useState(false),[convertResult,setConvertResult]=useState("");
+ const[grid,setGrid]=useState(false),[selected,setSelected]=useState<string[]>([]),[selectMode,setSelectMode]=useState(false),[tagModal,setTagModal]=useState(false),[tag,setTag]=useState(""),[tags,setTags]=useState<string[]>([]);\n const[convertModal,setConvertModal]=useState(false),[convertBusy,setConvertBusy]=useState(false),[convertResult,setConvertResult]=useState("");\n const[convertMode,setConvertMode]=useState<"main"|"more">("main");
  const c=dark?{bg:"#0D1117",card:"#161B22",soft:"#212936",text:"#F0F6FC",muted:"#8B98A9",border:"#30363D",accent:"#4F8CFF",danger:"#FF6B6B"}:{bg:"#F5F7FB",card:"#FFF",soft:"#EEF2F7",text:"#162033",muted:"#718096",border:"#E2E8F0",accent:"#3B82F6",danger:"#EF4444"};
 
  useEffect(()=>{AsyncStorage.getItem(KEY).then(x=>{if(x){const v=JSON.parse(x);setDocs(v.docs||[]);setTrash(v.trash||[])}})},[]);
@@ -128,7 +128,27 @@ export default function App(){
   if(await Sharing.isAvailableAsync()) await Sharing.shareAsync(r.uri);
   return r.uri;
  }
- async function runConversion(kind:"imagepdf"|"wordpdf"|"pdfword"){
+ async function runConversion(kind:"imagepdf"|"wordpdf"|"pdfword"|"pdfimages"|"extract"|"imagestext"){
+  try{
+   setConvertBusy(true);setConvertResult("");
+   if(kind==="pdfimages"){
+    const pick=await DocumentPicker.getDocumentAsync({type:"application/pdf",copyToCacheDirectory:true,multiple:false});
+    if(pick.canceled)return;
+    Alert.alert("PDF → Images","Imported PDF support is ready, but rendering arbitrary PDF pages to images requires a native PDF renderer. This will be part of the native PDF engine batch.");
+    return;
+   }
+   if(kind==="extract"){
+    const pick=await DocumentPicker.getDocumentAsync({type:"application/pdf",copyToCacheDirectory:true,multiple:false});
+    if(pick.canceled)return;
+    Alert.alert("Extract pages","For scans created in ScanFlow, use the Split scan feature. Arbitrary imported PDF page extraction requires the native PDF engine.");
+    return;
+   }
+   if(kind==="imagestext"){
+    const pick=await ImagePicker.launchImageLibraryAsync({mediaTypes:["images"],allowsMultipleSelection:true,quality:1});
+    if(pick.canceled||!pick.assets?.length)return;
+    const html="<html><body style='font-family:Arial;padding:28px'><h2>Image information</h2>"+pick.assets.map((a,i)=>"<p><b>Image "+(i+1)+"</b><br/>File selected from device. OCR text recognition can be added later with an OCR engine.</p>").join("")+"</body></html>";
+    const r=await Print.printToFileAsync({html});setDocs(v=>[{id:uid(),name:"Image Information",pages:[],createdAt:Date.now(),favorite:false,folder:"Text",pdfUri:r.uri,fileType:"text"},...v]);setConvertResult("Created image information PDF.");return;
+   }
   try{
    setConvertBusy(true);setConvertResult("");
    if(kind==="imagepdf"){
