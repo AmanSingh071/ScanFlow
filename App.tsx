@@ -200,8 +200,7 @@ export default function App(){
  ["📕","PDF → Word",()=>{setConvertModal(true)}],
  ["📥","Import PDF",importPdf],
  ["📝","Text to PDF",()=>setTextModal(true)],
- ["⭐","Favorites",()=>setDocs(x=>[...x.filter(d=>d.favorite),...x.filter(d=>!d.favorite)])],["🗑️","Trash",()=>Alert.alert("Trash",trash.length?trash.map(x=>x.name).join("
-"):"Trash is empty")],
+ ["⭐","Favorites",()=>setDocs(x=>[...x.filter(d=>d.favorite),...x.filter(d=>!d.favorite)])],["🗑️","Trash",()=>Alert.alert("Trash",trash.length?trash.map(x=>x.name).join("\n"):"Trash is empty")],
  ["✏️","Rename",()=>tool("Rename","Long-press or tap the ⋮ menu on a document.")],["🖼️","Multi-page Import",gallery],
  ["🔎","OCR Text",()=>tool("OCR engine","OCR will be connected to the conversion backend so scanned PDFs can return editable text.")],["🔄","PDF ↔ Word",()=>tool("PDF ↔ Word","Conversion is wired for the secure backend batch; it needs a server API key and must not be embedded in the APK.")],
  ["🗜️","Compress scans",()=>{const d=docs.find(z=>z.pages.length>0);d?compressDocument(d):Alert.alert("No scan","Save a scanned document first.")}],["✂️","Merge scanned docs",mergeScans],["🧩","Split scan",()=>{const d=docs.find(z=>z.pages.length>1);d?splitScan(d):Alert.alert("No multi-page scan","Save a document with at least 2 pages.")}],
